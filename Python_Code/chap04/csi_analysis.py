@@ -5,15 +5,15 @@ import ast
 
 # ================= 配置区域 =================
 # 输入文件名 (请确保这是您之前清洗后保存的Excel文件)
-INPUT_FILE = 'csi_data_cleaned_fixed.xlsx'
+INPUT_FILE = 'data/Antanne_1_original.xlsx'
 
 # 时间段定义
 TIME_RANGES = {
-    'No Target':             ('14:40:45', '14:40:55'), # 无目标
-    'Position 1 (Left-Top)': ('14:41:06', '14:41:16'), # 左上角
-    'Position 2 (Right-Top)':('14:41:36', '14:41:46'), # 右上角
-    'Position 3 (Bot-Right)':('14:41:52', '14:42:02'), # 右下角 (原位置1时间段)
-    'Position 4 (Center)':   ('14:42:07', '14:42:17')  # 正中间
+    'No Target':             ('11:10:25', '11:10:35'), # 无目标
+    'Position 1 ': ('11:11:50', '11:12:00'), # Close to Antenna 4
+    'Position 2 ':('11:12:48', '11:12:58'), # Close to Antenna 5
+    # 'Position 3 ':('11:12:30', '11:12:40'), # Close to Antenna 6
+    # 'Position 4 (Center)':   ('11:12:50', '11:13:00')  # 正中间
 }
 # ===========================================
 
@@ -179,7 +179,7 @@ def main():
     plt.grid(True, linestyle='--', alpha=0.6)
 
     plt.tight_layout()
-    output_img = 'csi_analysis_result.png'
+    output_img = '../../Thesis-figures/chap04/ESP32/antanne_1_original.jpg'
     plt.savefig(output_img, dpi=600)
     plt.show()
     print(f"分析完成！图片已保存为: {output_img}")

@@ -5,21 +5,21 @@ import ast
 from scipy import signal # 引入信号处理库
 
 # ================= 配置区域 =================
-INPUT_FILE = 'csi_data_cleaned_fixed.xlsx'
+INPUT_FILE = 'data/csi_data_106_handled.xlsx'
 TARGET_SUB_IDX = 32  # 第33个子载波
 
 # 模拟采样率 (假设每秒100Hz，影响不大，主要用于滤波器设计)
 FS = 100 
 # 巴特沃斯低通滤波器配置 (调整: 折衷选择 5Hz，兼顾静态稳定性和微动特征)
-CUTOFF_FREQ = 15 
+CUTOFF_FREQ = 25  # 截止频率 (Hz) 
 FILTER_ORDER = 4
 
 TIME_RANGES = {
-    'No Target':             ('14:40:45', '14:40:55'),
-    'Position 1 (Left-Top)': ('14:41:06', '14:41:16'),
-    'Position 2 (Right-Top)':('14:41:36', '14:41:46'),
-    'Position 3 (Bot-Right)':('14:41:52', '14:42:02')
-    # 'Position 4 (Center)':   ('14:42:07', '14:42:17')
+    'No Target':             ('22:20:45', '22:20:55'),
+    'Position 1 (Left-Top)': ('22:21:09', '22:21:19'),
+    'Position 2 (Right-Top)':('22:21:52', '22:22:02'),
+    'Position 3 (Bot-Right)':('22:21:31', '22:21:41'),
+    'Position 4 (Center)':   ('22:22:07', '22:22:17')
 }
 # ===========================================
 
@@ -173,14 +173,14 @@ def main():
     plt.grid(True, axis='y')
     
     plt.tight_layout(rect=[0, 0.03, 1, 0.95])
-    output_img = 'amp_phase_result.png'
+    output_img = '../../Thesis-figures/chap04/amp_phase_result_106_handled.jpg'
     plt.savefig(output_img, dpi=600)
     plt.show()
     print(f"分析完成！图片已保存为: {output_img}")
     
     # ================= 打印统计报告 =================
     print("\n" + "="*85)
-    print(" >>> 特征稳定性定量分析报告 (优化滤波器 2Hz) <<<")
+    print(" >>> 特征稳定性定量分析报告 (优化滤波器 25Hz) <<<")
     print("="*85)
     print(f"{'Label':<25} | {'Mean Amp':<10} | {'CV(Raw)%':<10} | {'CV(Filt)%':<10} | {'Phase Std':<10}")
     print("-" * 85)

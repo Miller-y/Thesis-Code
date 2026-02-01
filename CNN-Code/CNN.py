@@ -54,7 +54,7 @@ class CNNModel(nn.Module):
     def __init__(self):
         super(CNNModel, self).__init__()
         self.conv = nn.Sequential(
-            nn.Conv2d(8, 32, kernel_size=(3, 3), stride=1, padding=1),  # 4 为天线数
+            nn.Conv2d(8, 32, kernel_size=(3, 3), stride=1, padding=1),  # 8 为天线数
             nn.ReLU(),
             nn.MaxPool2d(kernel_size=(2, 2)),
             nn.Conv2d(32, 64, kernel_size=(3, 3), stride=1, padding=1),
@@ -74,7 +74,7 @@ class CNNModel(nn.Module):
         )
 
     def forward(self, x):
-        print("原始输入维度:", x.shape)  # 应为 [32, 4, 108, 300]
+        print("原始输入维度:", x.shape)  # 应为 [32, 8, 108, 300]
         x = self.conv(x)
         x = self.fc(x)
         return x
@@ -185,8 +185,8 @@ def visualize_positions(true_positions, predicted_positions, title='Position Com
 
 
 # 数据加载路径
-train_mat_file = 'C:/Users/529B/Downloads/CNN代码/train1.mat'  # 替换为训练数据路径
-test_mat_file = 'C:/Users/529B/Downloads/CNN代码/test1.mat'  # 替换为测试数据路径
+train_mat_file = 'data/train1.mat'  # 替换为训练数据路径
+test_mat_file = 'data/test1.mat'  # 替换为测试数据路径
 
 # 加载数据集
 train_dataset = CSIDataset(train_mat_file, flag='train')

@@ -5,19 +5,19 @@ import ast
 
 # ================= 配置区域 =================
 # 输入文件名
-INPUT_FILE = 'csi_data_cleaned_fixed.xlsx'
+INPUT_FILE = 'data/csi_data_104_handled.xlsx'
 
 # 目标子载波索引 (从0开始计数)
 # 第33个子载波 -> 索引 32
-TARGET_SUBCARRIER_INDEX = 32 
+TARGET_SUBCARRIER_INDEX = 20 
 
 # 时间段定义
 TIME_RANGES = {
-    'No Target':             ('14:40:45', '14:40:55'),
-    'Position 1 (Left-Top)': ('14:41:06', '14:41:16'),
-    'Position 2 (Right-Top)':('14:41:36', '14:41:46'),
-    'Position 3 (Bot-Right)':('14:41:52', '14:42:02'),
-    'Position 4 (Center)':   ('14:42:07', '14:42:17')
+    'No Target':             ('22:20:45', '22:20:55'),
+    'Position 1 (Left-Top)': ('22:21:09', '22:21:19'),
+    'Position 2 (Right-Top)':('22:21:52', '22:22:02'),
+    'Position 3 (Bot-Right)':('22:21:31', '22:21:41'),
+    'Position 4 (Center)':   ('22:22:07', '22:22:17')
 }
 # ===========================================
 
@@ -153,7 +153,8 @@ def main():
     plt.ylabel('Amplitude')
     plt.legend(fontsize='small')
     plt.grid(True, linestyle='--', alpha=0.5)
-
+    output_img = '../../Thesis-figures/chap04/single_result_104_handled.jpg'
+    plt.savefig(output_img, dpi=600)
     plt.tight_layout()
     plt.show()
 
