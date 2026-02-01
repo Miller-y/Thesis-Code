@@ -5,15 +5,23 @@ import ast
 
 # ================= 配置区域 =================
 # 输入文件名 (请确保这是您之前清洗后保存的Excel文件)
-INPUT_FILE = 'data/Antanne_1_original.xlsx'
+INPUT_FILE = 'data/Antanne_3_original.xlsx'
 
-# 时间段定义
+# # 时间段定义(ESP32C6)
+# TIME_RANGES = {
+#     'No Target':             ('22:20:45', '22:20:55'), # 无目标
+#     'Position 1 ': ('22:21:09', '22:21:19'), # Close to Antenna 4
+#     'Position 2 ':('22:21:31', '22:21:39'), # Close to Antenna 5
+#     'Position 3 ':('22:21:52', '22:22:02'), # Close to Antenna 6
+#     'Position 4 (Center)':   ('22:22:15', '22:22:25')  # 正中间
+# }
+# 时间段定义(ESP32)
 TIME_RANGES = {
-    'No Target':             ('11:10:25', '11:10:35'), # 无目标
+    'No Target':             ('11:20:40', '11:20:50'), # 无目标
     'Position 1 ': ('11:11:50', '11:12:00'), # Close to Antenna 4
-    'Position 2 ':('11:12:48', '11:12:58'), # Close to Antenna 5
-    # 'Position 3 ':('11:12:30', '11:12:40'), # Close to Antenna 6
-    # 'Position 4 (Center)':   ('11:12:50', '11:13:00')  # 正中间
+    'Position 2 ':('11:12:20', '11:12:30'), # Close to Antenna 5
+    'Position 3 ':('11:15:37', '11:15:47'), # Close to Antenna 6
+    'Position 4 (Center)':   ('11:16:05', '11:16:15')  # 正中间
 }
 # ===========================================
 
@@ -119,12 +127,15 @@ def main():
         return
 
     print("3. 正在生成对比图...")
+    import os
     
-    # 创建一个更大的画布，包含差分图
-    plt.figure(figsize=(18, 6))
+    # 输出目录
+    output_dir = '../../Thesis-figures/chap04/ESP32/antanne_3_diffrent_position'
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir, exist_ok=True)
     
     # --- 1. 原始幅度图 ---
-    plt.subplot(1, 3, 1)
+    fig1 = plt.figure(figsize=(8, 6))
     for label, data in results.items():
         x_axis = range(len(data['amp']))
         plt.plot(x_axis, data['amp'], label=label, marker='.', markersize=4, alpha=0.8)
@@ -134,9 +145,14 @@ def main():
     plt.ylabel('Amplitude')
     plt.legend(fontsize='small')
     plt.grid(True, linestyle='--', alpha=0.6)
+    plt.tight_layout()
+    out_1 = os.path.join(output_dir, 'Raw_Amplitude_Avg.jpg')
+    plt.savefig(out_1, dpi=600)
+    print(f"图片已保存: {out_1}")
+    plt.close(fig1)
 
     # --- 2. 差分幅度图 (幅度减除) ---
-    plt.subplot(1, 3, 2)
+    fig2 = plt.figure(figsize=(8, 6))
     
     # 获取背景基准
     bg_key = 'No Target'
@@ -164,10 +180,15 @@ def main():
     plt.ylabel('Amp Difference')
     plt.legend(fontsize='small')
     plt.grid(True, linestyle='--', alpha=0.6)
+    plt.tight_layout()
+    out_2 = os.path.join(output_dir, 'Amplitude_Difference_Target-NoTarget.jpg')
+    plt.savefig(out_2, dpi=600)
+    print(f"图片已保存: {out_2}")
+    plt.close(fig2)
 
 
     # --- 3. 相位图 ---
-    plt.subplot(1, 3, 3)
+    fig3 = plt.figure(figsize=(8, 6))
     for label, data in results.items():
         x_axis = range(len(data['phase']))
         plt.plot(x_axis, data['phase'], label=label, marker='.', markersize=4, alpha=0.8)
@@ -177,12 +198,13 @@ def main():
     plt.ylabel('Phase (Radians)')
     plt.legend()
     plt.grid(True, linestyle='--', alpha=0.6)
-
     plt.tight_layout()
-    output_img = '../../Thesis-figures/chap04/ESP32/antanne_1_original.jpg'
-    plt.savefig(output_img, dpi=600)
-    plt.show()
-    print(f"分析完成！图片已保存为: {output_img}")
+    out_3 = os.path.join(output_dir, 'CSI_Phase_Comparison_Unwrapped.jpg')
+    plt.savefig(out_3, dpi=600)
+    print(f"图片已保存: {out_3}")
+    plt.close(fig3)
+    
+    print(f"所有分析图片已保存至目录: {output_dir}")
 
 if __name__ == '__main__':
     main()

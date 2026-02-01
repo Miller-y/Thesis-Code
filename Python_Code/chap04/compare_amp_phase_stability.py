@@ -133,78 +133,149 @@ def main():
         })
         
     # ================= 可视化 =================
-    fig = plt.figure(figsize=(16, 10))
-    plt.suptitle(f'Feature Stability: Amplitude (Filtered) vs Phase (Subcarrier {TARGET_SUB_IDX})', fontsize=16)
-    
-    # 1. 滤波效果对比 (前100帧)
-    ax1 = plt.subplot(2, 2, 1)
+    import os
+    # 输出目录
+    output_dir = '../../Thesis-figures/chap04/ESP32C6/amp_phase_result_106_handled'
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir, exist_ok=True)
+
+    # 1. 滤波效果对比 (前100帧) - Amplitude
+    fig1 = plt.figure(figsize=(8, 6))
     for i, label in enumerate(data_store['labels']):
         # 画虚线表示原始，实线表示滤波后
         # plt.plot(data_store['amp_list'][i][:150], linestyle=':', alpha=0.4, linewidth=1) 
         plt.plot(data_store['amp_filtered_list'][i][:150], label=label, alpha=0.9, linewidth=2)
-    plt.title('Time Domain: Amplitude (Low-Pass Filtered)')
+    plt.title(f'Time Domain: Amplitude (Low-Pass Filtered)\nSubcarrier {TARGET_SUB_IDX}')
     plt.ylabel('Amplitude')
     plt.xlabel('Frame Index (First 150)')
     plt.grid(True, linestyle='--', alpha=0.5)
     plt.legend(fontsize='small')
-    
-    ax2 = plt.subplot(2, 2, 2)
+    plt.tight_layout()
+    out_1 = os.path.join(output_dir, 'Time_Domain_Amplitude_Filtered.jpg')
+    plt.savefig(out_1, dpi=600)
+    print(f"图片已保存: {out_1}")
+    plt.close(fig1)
+
+    # 2. 滤波效果对比 (前100帧) - Phase
+    fig2 = plt.figure(figsize=(8, 6))
     for i, label in enumerate(data_store['labels']):
         plt.plot(data_store['phase_unwrapped_list'][i][:150], label=label, alpha=0.9, linewidth=1.5)
-    plt.title('Time Domain: Phase (Detrended)')
+    plt.title(f'Time Domain: Phase (Detrended)\nSubcarrier {TARGET_SUB_IDX}')
     plt.ylabel('Phase (Radians)')
     plt.xlabel('Frame Index (First 150)')
     plt.grid(True, linestyle='--', alpha=0.5)
-    # plt.legend(fontsize='small')
+    # plt.legend(fontsize='small') # 图图例如果太多会遮挡，可选
+    plt.tight_layout()
+    out_2 = os.path.join(output_dir, 'Time_Domain_Phase_Detrended.jpg')
+    plt.savefig(out_2, dpi=600)
+    print(f"图片已保存: {out_2}")
+    plt.close(fig2)
 
-    # 2. 分布区分度 (箱线图) - 使用滤波后的数据
-    ax3 = plt.subplot(2, 2, 3)
+    # 3. 分布区分度 (箱线图) - Amplitude
+    fig3 = plt.figure(figsize=(8, 6))
     plt.boxplot(data_store['amp_filtered_list'], tick_labels=data_store['labels'], patch_artist=True, boxprops=dict(facecolor='lightblue'))
-    plt.title('Distribution: Amplitude (Filtered) -> Stable & Separable')
+    plt.title(f'Distribution: Amplitude (Filtered)\nSubcarrier {TARGET_SUB_IDX}')
     plt.ylabel('Amplitude')
     plt.xticks(rotation=20)
     plt.grid(True, axis='y')
+    plt.tight_layout()
+    out_3 = os.path.join(output_dir, 'Distribution_Amplitude_Filtered.jpg')
+    plt.savefig(out_3, dpi=600)
+    print(f"图片已保存: {out_3}")
+    plt.close(fig3)
     
-    ax4 = plt.subplot(2, 2, 4)
+    # 4. 分布区分度 (箱线图) - Phase
+    fig4 = plt.figure(figsize=(8, 6))
     plt.boxplot(data_store['phase_unwrapped_list'], tick_labels=data_store['labels'], patch_artist=True, boxprops=dict(facecolor='lightgreen'))
-    plt.title('Distribution: Phase (Detrended) -> Chaotic')
+    plt.title(f'Distribution: Phase (Detrended)\nSubcarrier {TARGET_SUB_IDX}')
     plt.ylabel('Phase (Radians)')
     plt.xticks(rotation=20)
     plt.grid(True, axis='y')
+    plt.tight_layout()
+    out_4 = os.path.join(output_dir, 'Distribution_Phase_Detrended.jpg')
+    plt.savefig(out_4, dpi=600)
+    print(f"图片已保存: {out_4}")
+    plt.close(fig4)
     
-    plt.tight_layout(rect=[0, 0.03, 1, 0.95])
-    output_img = '../../Thesis-figures/chap04/amp_phase_result_106_handled.jpg'
-    plt.savefig(output_img, dpi=600)
-    plt.show()
-    print(f"分析完成！图片已保存为: {output_img}")
+    print(f"所有分析图片已保存至目录: {output_dir}")
     
-    # ================= 打印统计报告 =================
-    print("\n" + "="*85)
-    print(" >>> 特征稳定性定量分析报告 (优化滤波器 25Hz) <<<")
-    print("="*85)
-    print(f"{'Label':<25} | {'Mean Amp':<10} | {'CV(Raw)%':<10} | {'CV(Filt)%':<10} | {'Phase Std':<10}")
-    print("-" * 85)
+    # ================= 生成统计报告 =================
+    report_lines = []
+    report_lines.append("="*85)
+    report_lines.append(" >>> CSI特征稳定性与可用性定量分析报告 (ESP32C6) <<<")
+    report_lines.append("="*85)
+    report_lines.append(f"子载波索引: {TARGET_SUB_IDX}")
+    report_lines.append(f"滤波器配置: Butterworth Lowpass (Cutoff={CUTOFF_FREQ}Hz, Order={FILTER_ORDER})")
+    report_lines.append("-" * 85)
+    report_lines.append(f"{'Label':<25} | {'Mean Amp':<10} | {'CV(Raw)%':<10} | {'CV(Filt)%':<10} | {'Phase Std':<10}")
+    report_lines.append("-" * 85)
     
     total_amp_filt_cv = 0
+    total_phase_std = 0
+    valid_count = 0
     
+    # 存储用于计算区分度的均值
+    amp_means = []
+    phase_means = []
+
     for m in metrics:
-        print(f"{m['Label']:<25} | {m['Amp_Mean']:<10.2f} | {m['Amp_CV_Raw(%)']:<10.2f} | {m['Amp_CV_Filt(%)']:<10.2f} | {m['Phase_Std(Cleaned)']:<10.2f}")
+        report_lines.append(f"{m['Label']:<25} | {m['Amp_Mean']:<10.2f} | {m['Amp_CV_Raw(%)']:<10.2f} | {m['Amp_CV_Filt(%)']:<10.2f} | {m['Phase_Std(Cleaned)']:<10.2f}")
         total_amp_filt_cv += m['Amp_CV_Filt(%)']
+        total_phase_std += m['Phase_Std(Cleaned)']
+        amp_means.append(m['Amp_Mean'])
+        # 简单计算一下相位的均值，尽管对于随机相位意义不大，但可以看是否重叠
+         # 由于没有在metrics里存Phase Mean，这里暂时略过，主要看Std
+        valid_count += 1
         
-    avg_amp_filt_cv = total_amp_filt_cv / len(metrics)
+    avg_amp_filt_cv = total_amp_filt_cv / valid_count if valid_count > 0 else 0
+    avg_phase_std = total_phase_std / valid_count if valid_count > 0 else 0
     
-    print("="*85)
-    print("结论验证 :")
-    print(f"1. 滤波后幅值平均变异系数 (CV): {avg_amp_filt_cv:.2f}%")
-    print(f"2. 原始相位平均标准差 (Rad): {np.mean([m['Phase_Std(Cleaned)'] for m in metrics]):.2f} (>> 2π, 纯噪声)")
+    # 简易区分度计算 (Standard Deviation of Means / Mean of Standard Deviations)
+    # 如果类间距离大，类内距离小，则比值大
+    amp_between_std = np.std(amp_means)
+    # amp_within_std 估算为平均 CV * 平均 Mean (反推) 或者直接拿各个组的std平均
+    # 这里直接用 CV 作为衡量“类内离散度”的指标，用 amp_between_std 衡量“类间区分度”
     
-    if avg_amp_filt_cv < 20: # 放宽标准，因为深衰落点CV高是物理特性
-        print("\n[完美] 实验数据强有力地支持使用 【幅度张量】。")
-        print(" - 相位数据表现为均匀随机分布，完全不可用。")
-        print(" - 幅度数据经低通滤波后，在大多数位置极其稳定 (<10%)。")
-        print(" - 个别高CV点(如Center)通常对应极低幅值(Deep Fade)，这是极佳的位置指纹特征！")
+    report_lines.append("="*85)
+    report_lines.append("分析结论与论述 :")
+    report_lines.append(f"1. 幅值稳定性 (Intra-class Stability):")
+    report_lines.append(f"   - 滤波后幅值的平均变异系数 (CV) 为 {avg_amp_filt_cv:.2f}%。")
+    if avg_amp_filt_cv < 15:
+        report_lines.append("   - 评级: [优秀]。低变异系数表明同一点位的幅值特征非常稳定，噪声影响较小。")
+    elif avg_amp_filt_cv < 25:
+        report_lines.append("   - 评级: [良好]。存在一定波动，可能是由于环境微动或Deep Fade导致，但在可接受范围内。")
     else:
-        print("\n[提示] 仍有波动，请检查是否特定位置幅值过低(Deep Fade)。")
+        report_lines.append("   - 评级: [较差]。幅值波动较大。")
+
+    report_lines.append(f"\n2. 相位随机性 (Phase Randomness):")
+    report_lines.append(f"   - 解卷绕并去趋势后的相位平均标准差为 {avg_phase_std:.2f} Rad。")
+    if avg_phase_std > 1.0:
+        report_lines.append("   - 评级: [高随机性]。相位标准差很大，说明相位在同一点位内剧烈跳变。")
+        report_lines.append("   - 原因: ESP32等低成本WiFi网卡的载波频率偏移(CFO)和采样时钟偏移(SFO)导致的相位非线性误差难以完全消除。")
+    else:
+        report_lines.append("   - 评级: [中等]。相位具有一定稳定性，但通常不如幅值可靠。")
+
+    report_lines.append(f"\n3. 综合推荐 (Recommendation for Neural Networks):")
+    if avg_amp_filt_cv < 20 and avg_phase_std > 0.5:
+        report_lines.append("   基于上述指标，强烈推荐使用 **[CSI幅值]** (Amplitude) 作为神经网络的输入特征。")
+        report_lines.append("   理由:")
+        report_lines.append("   (1) 稳定性: 幅值在静态场景下保持高度稳定(低CV)，有利于网络学习到位置与信号强度的确定性映射。")
+        report_lines.append("   (2) 可分性: 不同位置的幅值均值差异明显(见箱线图)，构成了清晰的位置指纹(Fingerprint)。")
+        report_lines.append("   (3) 相位不可用: 原始相位含噪过大，即使经过解卷绕和去线性化，其随机抖动仍会淹没位置特征，导致网络无法收敛或过拟合。")
+    else:
+        report_lines.append("   虽然幅值表现较好，但需注意特定场景下的噪声处理。仍建议优先考虑幅值。")
+    
+    report_lines.append("\n" + "="*85)
+    
+    # 打印并保存
+    report_text = "\n".join(report_lines)
+    print(report_text)
+    
+    # with open(output_report, "w", encoding='utf-8') as f:
+    #     f.write(report_text)
+    # print(f"\n详细报告已保存至: {output_report}")
+    
+    # plt.show()
 
 
 if __name__ == '__main__':

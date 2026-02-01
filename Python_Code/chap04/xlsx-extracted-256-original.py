@@ -2,8 +2,8 @@ import pandas as pd
 import ast
 
 # 1. 设置文件路径
-input_file = 'data/Antanne_1.xlsx'  # 请修改为您实际的文件名
-output_file = 'data/Antanne_1_original.xlsx'
+input_file = 'data/Antanne_3.xlsx'  # 请修改为您实际的文件名
+output_file = 'data/Antanne_3_original.xlsx'
 
 # 需要剔除的子载波对索引 (0-127)
 # 头部2对: 0-1

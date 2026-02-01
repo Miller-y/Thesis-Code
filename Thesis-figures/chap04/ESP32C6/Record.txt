@@ -1,0 +1,24 @@
+csi_analysis_result_104_original与csi_analysis_result_104_handled（Gemini分析）
+
+ESP32/antanne_1_diffrent_position，antanne_3_diffrent_position
+ESP32C6/csi_analysis_result_105_handled与csi_analysis_result_106_handled
+（Gemini分析）
+
+three_devices_comparison（Gemini分析+report）
+
+3d_comparison_104与3d_comparison_106（通过 3D 曲面图（Surface Plot）直观地展示ESP32C6设备信号在频率和时间上的波动特征）
+
+
+amp_phase_result_106_handled（stability_analysis_report）
+
+single_result_104_handled（analysis_report_sub20）
+
+
+filter_comparison_106（filter_comparison_106_report）
+
+
+由于我写这个代码的目的是想去研究当铝箔包裹的泡沫小球处于不同位置的时ESP32的CSI幅值信息与相位信息的关键指标变化。所以我希望你在生成结果图的同时能够清楚的知道对比效果以及给出分析论述和结论。
+
+在绘图的同时，计算各种关键指标，
+基于这些指标，根据逻辑自动生成一段推荐结论。
+这个分析和结论会直接打印在控制台，并在同图片输出目录下保存为一个单独的 .txt 报告文件。
