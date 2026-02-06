@@ -26,10 +26,8 @@ $$ CV = \frac{\sigma}{\mu} \times 100\% $$
 **代码实现：**
 ```python
 # c1, c2 是两个位置的复数均值点 (类聚中心)
-# std1, std2 是两个位置的幅值标准差 (近似代表类聚半径)
 
 dist = np.abs(c1 - c2)                 # 1. 计算中心距离
-separation_score = dist / (std1 + std2)  # 2. 计算区分度得分
 ```
 
 **数学公式：**

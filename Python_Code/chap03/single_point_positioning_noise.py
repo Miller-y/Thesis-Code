@@ -262,25 +262,33 @@ def run_positioning_experiment():
     print("Camera System Initialized.")
     print(f"Cam1 L_true:\n{cameras[0].L_true}")
     
-    noise_levels = np.linspace(0, 2.0, 11) # 0 到 2.0 像素级别噪声
+    noise_levels = np.linspace(0, 4.0, 11) # 0 到 4.0 像素级别噪声
     n_trials = 50 # 每个噪声等级实验次数
     n_calib_points = 60 # 标定点数量
     
-    # 存储结果: [NoiseLevel, Method] -> Mean Euclidean Error
-    # Method 0: DLT, 1: LM, 2: WMLE
-    results_pos_error = np.zeros((len(noise_levels), 3))
+    # 存储结果字典，包含原始数据以便画箱线图
+    # Structure: method -> list of arrays (one array per noise level)
+    raw_data = {
+        'noise_levels': noise_levels,
+        'dlt': {'total': [], 'xyz': []},
+        'lm': {'total': [], 'xyz': []},
+        'wmle': {'total': [], 'xyz': []}
+    }
     
-    # 新增: 存储 XYZ 分量误差 [NoiseLevel, Method, 3(x,y,z)]
-    results_xyz_error = np.zeros((len(noise_levels), 3, 3))
+    # 存储均值用于打印和总误差曲线
+    results_pos_error_mean = np.zeros((len(noise_levels), 3))
+    results_pos_error_std = np.zeros((len(noise_levels), 3))
     
     print("Starting Positioning Simulation...")
-    
+    print(f"{'Noise':<6} | {'DLT Mean':<10} {'DLT Std':<10} | {'LM Mean':<10} {'LM Std':<10} | {'WMLE Mean':<10} {'WMLE Std':<10}")
+    print("-" * 80)
+
     for i, nl in enumerate(noise_levels):
         errors_dlt = []
         errors_lm = []
         errors_wmle = []
         
-        # 临时存储 XYZ 误差列表
+        # 临时存储 XYZ 误差列表 (n_trials, 3)
         xyz_err_dlt_list = []
         xyz_err_lm_list = []
         xyz_err_wmle_list = []
@@ -332,55 +340,140 @@ def run_positioning_experiment():
             errors_wmle.append(np.linalg.norm(pt_est_wmle - target_pt))
             xyz_err_wmle_list.append(np.abs(pt_est_wmle - target_pt))
             
-        results_pos_error[i, 0] = np.mean(errors_dlt)
-        results_pos_error[i, 1] = np.mean(errors_lm)
-        results_pos_error[i, 2] = np.mean(errors_wmle)
+        # Store Raw Data
+        raw_data['dlt']['total'].append(np.array(errors_dlt))
+        raw_data['dlt']['xyz'].append(np.array(xyz_err_dlt_list))
         
-        results_xyz_error[i, 0, :] = np.mean(xyz_err_dlt_list, axis=0)
-        results_xyz_error[i, 1, :] = np.mean(xyz_err_lm_list, axis=0)
-        results_xyz_error[i, 2, :] = np.mean(xyz_err_wmle_list, axis=0)
+        raw_data['lm']['total'].append(np.array(errors_lm))
+        raw_data['lm']['xyz'].append(np.array(xyz_err_lm_list))
         
-        print(f"Noise {nl:.1f}: DLT={results_pos_error[i,0]:.2f}mm, LM={results_pos_error[i,1]:.2f}mm, WMLE={results_pos_error[i,2]:.2f}mm")
+        raw_data['wmle']['total'].append(np.array(errors_wmle))
+        raw_data['wmle']['xyz'].append(np.array(xyz_err_wmle_list))
 
-    return noise_levels, results_pos_error, results_xyz_error
+        # Statistics
+        results_pos_error_mean[i, 0] = np.mean(errors_dlt)
+        results_pos_error_mean[i, 1] = np.mean(errors_lm)
+        results_pos_error_mean[i, 2] = np.mean(errors_wmle)
+        
+        results_pos_error_std[i, 0] = np.std(errors_dlt)
+        results_pos_error_std[i, 1] = np.std(errors_lm)
+        results_pos_error_std[i, 2] = np.std(errors_wmle)
+        
+        print(f"{nl:<6.1f} | {results_pos_error_mean[i,0]:<10.2f} {results_pos_error_std[i,0]:<10.2f} | {results_pos_error_mean[i,1]:<10.2f} {results_pos_error_std[i,1]:<10.2f} | {results_pos_error_mean[i,2]:<10.2f} {results_pos_error_std[i,2]:<10.2f}")
+
+    return raw_data, results_pos_error_mean
 
 if __name__ == "__main__":
-    noise_vals, errors, errors_xyz = run_positioning_experiment()
+    raw_data, errors_mean = run_positioning_experiment()
+    noise_vals = raw_data['noise_levels']
     
-    # 创建 2x2 的子图
-    fig, axes = plt.subplots(2, 2, figsize=(14, 10))
-    
-    # 1. Total Error
-    ax = axes[0, 0]
-    ax.plot(noise_vals, errors[:, 0], 'k--o', label='DLT Method')
-    ax.plot(noise_vals, errors[:, 1], 'b-.^', label='LM Method')
-    ax.plot(noise_vals, errors[:, 2], 'r-s', linewidth=2, label='Proposed WMLE')
-    ax.set_xlabel('Noise Level Factor')
-    ax.set_ylabel('Total Euclidean Error (mm)')
-    ax.set_title('Total 3D Positioning Error')
-    ax.legend()
-    ax.grid(True, alpha=0.3)
-    
-    # Function to plot subplot
-    def plot_axis_error(ax, axis_idx, axis_name):
-        ax.plot(noise_vals, errors_xyz[:, 0, axis_idx], 'k--o', label='DLT')
-        ax.plot(noise_vals, errors_xyz[:, 1, axis_idx], 'b-.^', label='LM')
-        ax.plot(noise_vals, errors_xyz[:, 2, axis_idx], 'r-s', linewidth=2, label='WMLE')
-        ax.set_xlabel('Noise Level Factor')
-        ax.set_ylabel(f'{axis_name} Error (mm)')
-        ax.set_title(f'{axis_name}-Axis Positioning Error')
-        ax.legend()
-        ax.grid(True, alpha=0.3)
+    # 设置一个稍微优雅点的全局风格
+    plt.rcParams.update({
+        'font.family': 'serif',
+        'font.size': 12,
+        'axes.linewidth': 1.5,
+        'grid.linestyle': '--',
+        'grid.alpha': 0.6
+    })
 
-    # 2. X Error
-    plot_axis_error(axes[0, 1], 0, 'X')
-    
-    # 3. Y Error
-    plot_axis_error(axes[1, 0], 1, 'Y')
-    
-    # 4. Z Error (通常 Z 轴误差最大)
-    plot_axis_error(axes[1, 1], 2, 'Z')
-    
-    plt.tight_layout()
-    # plt.savefig('positioning_result_xyz.png')
-    plt.show()
+    def save_plot_line(x_data, y_datas, labels, title, ylabel, filename):
+        plt.figure(figsize=(8, 6))
+        
+        styles = [
+            {'c': '#E6B800', 'ls': '--', 'm': 'o', 'lw': 1.5, 'ms': 5}, # DLT (Yellow)
+            {'c': '#1f77b4', 'ls': '-.', 'm': '^', 'lw': 1.5, 'ms': 6}, # LM (Blue)
+            {'c': '#2ca02c', 'ls': '-',  'm': 's', 'lw': 2.5, 'ms': 7}  # WMLE (Green)
+        ] 
+        
+        for i, y_data in enumerate(y_datas):
+            plt.plot(x_data, y_data, 
+                     color=styles[i]['c'], 
+                     linestyle=styles[i]['ls'], 
+                     marker=styles[i]['m'],
+                     linewidth=styles[i]['lw'],
+                     markersize=styles[i]['ms'],
+                     label=labels[i])
+            
+        plt.xlabel('Heteroscedastic Noise Level Factor', fontsize=12)
+        plt.ylabel(ylabel, fontsize=12)
+        plt.title(title, fontsize=14, fontweight='bold', pad=12)
+        plt.legend(frameon=True, fancybox=True, shadow=True, fontsize=10, loc='upper left')
+        plt.grid(True)
+        plt.tight_layout()
+        plt.savefig(filename, dpi=600)
+        print(f"Saved {filename}")
+        # plt.show() 
+
+    def save_boxplot_xyz(raw_data, axis_idx, axis_name, filename):
+        """
+        绘制grouped boxplot
+        axis_idx: 0=x, 1=y, 2=z
+        """
+        plt.figure(figsize=(12, 6))
+        
+        # 准备数据
+        data_dlt = [ arr[:, axis_idx] for arr in raw_data['dlt']['xyz'] ]
+        data_lm = [ arr[:, axis_idx] for arr in raw_data['lm']['xyz'] ]
+        data_wmle = [ arr[:, axis_idx] for arr in raw_data['wmle']['xyz'] ]
+        
+        noise_levels = raw_data['noise_levels']
+        positions = np.arange(len(noise_levels))
+        
+        width = 0.25
+        
+        # 绘图函数 helper
+        def set_box_color(bp, color):
+            plt.setp(bp['boxes'], color=color, linewidth=1.5)
+            plt.setp(bp['whiskers'], color=color, linewidth=1.5)
+            plt.setp(bp['caps'], color=color, linewidth=1.5)
+            plt.setp(bp['medians'], color=color, linewidth=1.5)
+
+        # DLT
+        bp1 = plt.boxplot(data_dlt, positions=positions - width, widths=width, patch_artist=False, showfliers=False)
+        set_box_color(bp1, '#E6B800') # Yellow
+        
+        # LM
+        bp2 = plt.boxplot(data_lm, positions=positions, widths=width, patch_artist=False, showfliers=False)
+        set_box_color(bp2, '#1f77b4') # Blue
+        
+        # WMLE
+        bp3 = plt.boxplot(data_wmle, positions=positions + width, widths=width, patch_artist=False, showfliers=False)
+        set_box_color(bp3, '#2ca02c') # Green
+
+        # 伪造 legend handles
+        plt.plot([], c='#E6B800', label='DLT Method')
+        plt.plot([], c='#1f77b4', label='LM Method')
+        plt.plot([], c='#2ca02c', label='WMLE (Proposed)')
+
+        plt.xlabel('Heteroscedastic Noise Level Factor', fontsize=12)
+        plt.ylabel(f'Abs {axis_name} Error (mm)', fontsize=12)
+        plt.title(f'{axis_name}-Axis Error Distribution (Box Plot)', fontsize=14, fontweight='bold', pad=12)
+        
+        plt.xticks(positions, [f"{n:.1f}" for n in noise_levels])
+        plt.legend(frameon=True, fancybox=True, shadow=True, fontsize=10, loc='upper left')
+        plt.grid(True, axis='y', alpha=0.3)
+        plt.tight_layout()
+        plt.savefig(filename, dpi=600)
+        print(f"Saved {filename}")
+
+    method_labels = ['DLT Method', 'LM Method', 'Proposed WMLE']
+
+    # 1. Total Error Curve (保留总误差曲线，展示宏观趋势)
+    save_plot_line(
+        noise_vals, 
+        [errors_mean[:, 0], errors_mean[:, 1], errors_mean[:, 2]], 
+        method_labels, 
+        'Total 3D Positioning Error (Mean)', 
+        'Mean Euclidean Error (mm)', 
+        'positioning_error_total_mean.png'
+    )
+
+    # 2. X, Y, Z Errors as Box Plots
+    axes_names = ['X', 'Y', 'Z']
+    for i in range(3):
+        save_boxplot_xyz(
+            raw_data, 
+            i, 
+            axes_names[i], 
+            f'positioning_error_{axes_names[i].lower()}_boxplot.png'
+        )

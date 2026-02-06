@@ -227,7 +227,7 @@ def main():
     report_text = "\n".join(report_lines)
     print(report_text)
 
-    plt.title(f'CSI Amplitude Filter Analysis (Subcarrier #{target_idx})\nTime: {start_time}-{end_time}, FS={FS}Hz')
+    plt.title(f'CSI Amplitude Filter Analysis (Subcarrier #{target_idx})\nFS={FS}Hz')
     plt.xlabel('Time (seconds)')
     plt.ylabel('CSI Amplitude')
     plt.legend(loc='best')

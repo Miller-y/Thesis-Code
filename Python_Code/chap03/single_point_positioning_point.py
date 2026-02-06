@@ -214,7 +214,7 @@ class SimulatedCamera:
         # 边缘和远处的噪声呈指数级增长
         sigma = (0.1 + 
                  noise_level * (3.0 * (norm_dist ** 2.0) +    # 距离因子更强
-                                4.0 * (norm_edge ** 4.0)))    # 边缘因子极其敏感
+                                4.0 * (norm_edge ** 3.0)))    # 边缘因子极其敏感
                  
         noise = np.random.normal(0, sigma)
         return u_true + noise, sigma
@@ -261,7 +261,7 @@ def run_positioning_experiment():
     
     print("Camera System Initialized.")
     
-    fixed_noise = 2.0
+    fixed_noise = 3.0
     n_points = 100 # 100个随机测试样本点
     n_calib_points = 60 # 标定点数量
     
@@ -322,53 +322,104 @@ def run_positioning_experiment():
         results_xyz_error[i, 2, :] = np.abs(pt_est_wmle - target_pt)
         
         if (i+1) % 10 == 0:
-            print(f"Trial {i+1}/{n_points}: WMLE_Err={results_pos_error[i, 2]:.2f}mm")
+            # print(f"Trial {i+1}/{n_points}: WMLE_Err={results_pos_error[i, 2]:.2f}mm")
+            # 打印三种算法的关键数据
+            dlt_e = results_pos_error[i, 0]
+            lm_e = results_pos_error[i, 1]
+            wmle_e = results_pos_error[i, 2]
+            print(f"Trial {i+1}/{n_points} | Error(mm) >> DLT: {dlt_e:.2f}, LM: {lm_e:.2f}, WMLE: {wmle_e:.2f}")
 
     return np.arange(1, n_points + 1), results_pos_error, results_xyz_error
 
 if __name__ == "__main__":
     point_indices, errors, errors_xyz = run_positioning_experiment()
     
-    # 创建 2x2 的子图
-    fig, axes = plt.subplots(2, 2, figsize=(14, 10))
+    # --- 1. 打印详细统计数据 (Mean, Max, Std) ---
+    print("\n" + "="*80)
+    print(f"{'Metric':<10} | {'Method':<6} | {'Mean':<10} | {'Max':<10} | {'Std':<10}")
+    print("-" * 80)
     
-    # 通用绘图函数
-    def plot_comparison(ax, data, title, ylabel):
-        ax.plot(point_indices, data[:, 0], 'k--', alpha=0.6, label='DLT', linewidth=1)
-        ax.plot(point_indices, data[:, 1], 'b-.', alpha=0.6, label='LM', linewidth=1)
-        ax.plot(point_indices, data[:, 2], 'r-', alpha=0.9, label='WMLE', linewidth=1.5)
+    methods = ['DLT', 'LM', 'WMLE']
+    
+    def print_stat(name, data_matrix):
+        # data_matrix: [n_points, 3] (0:DLT, 1:LM, 2:WMLE)
+        means = np.mean(data_matrix, axis=0)
+        maxs = np.max(data_matrix, axis=0)
+        stds = np.std(data_matrix, axis=0)
+        for i, m in enumerate(methods):
+            print(f"{name:<10} | {m:<6} | {means[i]:<10.4f} | {maxs[i]:<10.4f} | {stds[i]:<10.4f}")
+        print("-" * 80)
+
+    print_stat("Total Err", errors)
+    print_stat("X Err", errors_xyz[:, :, 0])
+    print_stat("Y Err", errors_xyz[:, :, 1])
+    print_stat("Z Err", errors_xyz[:, :, 2])
+    print("="*80 + "\n")
+
+    # --- 2. 绘图设置 (Separate Figures, Blue-Green-Yellow) ---
+    # 定义颜色: Yellow(DLT), Blue(LM), Green(WMLE)
+    # 使用稍微深一点的黄色/金色以保证在白底上的可见度
+    colors = ["#E6B800", '#1f77b4', '#2ca02c'] 
+    styles = ['--', '-.', '-']  # DLT虚线, LM点划线, WMLE实线
+    
+    def plot_and_save(data, title, ylabel, filename):
+        plt.figure(figsize=(10, 6)) # 独立Figure
         
-        # 绘制均值线
+        # 优化字体和线条
+        plt.rcParams['font.family'] = 'sans-serif'
+        plt.rcParams['axes.linewidth'] = 1.2
+        
+        # 绘制三条线
+        plt.plot(point_indices, data[:, 0], color=colors[0], linestyle=styles[0], 
+                 label='DLT', alpha=0.7, linewidth=1.5)
+        plt.plot(point_indices, data[:, 1], color=colors[1], linestyle=styles[1], 
+                 label='LM', alpha=0.7, linewidth=1.5)
+        plt.plot(point_indices, data[:, 2], color=colors[2], linestyle=styles[2], 
+                 label='WMLE', alpha=0.9, linewidth=2.5) # WMLE highlight
+        
+        # 绘制均值横线
         means = np.mean(data, axis=0)
-        ax.axhline(y=means[0], color='k', linestyle=':', linewidth=2, alpha=0.5)
-        ax.axhline(y=means[1], color='b', linestyle=':', linewidth=2, alpha=0.5)
-        ax.axhline(y=means[2], color='r', linestyle='-', linewidth=2, alpha=0.4, label=f'Mean WMLE: {means[2]:.2f}')
+        plt.axhline(y=means[0], color=colors[0], linestyle=':', alpha=0.4, linewidth=1.5)
+        plt.axhline(y=means[1], color=colors[1], linestyle=':', alpha=0.4, linewidth=1.5)
+        plt.axhline(y=means[2], color=colors[2], linestyle=':', alpha=0.6, linewidth=2, 
+                    label=f'WMLE Mean: {means[2]:.2f}')
         
-        ax.set_xlabel('Sample Point Index')
-        ax.set_ylabel(ylabel)
-        ax.set_title(title)
-        ax.legend(loc='upper right', fontsize='small')
-        ax.grid(True, alpha=0.3)
-        # 限制纵坐标范围以免个别飞点破坏显示
-        ylim_top = np.percentile(data, 98) * 1.5 
-        ax.set_ylim(0, ylim_top)
+        # 标签与装饰
+        plt.xlabel('Sample Point Index', fontsize=12, fontweight='bold')
+        plt.ylabel(ylabel, fontsize=12, fontweight='bold')
+        plt.title(title, fontsize=14, pad=15, fontweight='bold')
+        
+        # 图例美化
+        plt.legend(loc='upper right', fontsize=10, 
+                  frameon=True, framealpha=0.9, edgecolor='gray', fancybox=True, shadow=True)
+        
+        plt.grid(True, linestyle='--', alpha=0.4)
+        
+        # 自动调整Y轴范围，去除极端值影响
+        try:
+            ylim_top = np.percentile(data, 98) * 1.5 
+            if np.isnan(ylim_top) or ylim_top <= 0:
+                ylim_top = np.max(data) * 1.1
+            plt.ylim(0, ylim_top)
+        except:
+            pass
+        
+        plt.tight_layout()
+        
+        # 保存高清大图
+        plt.savefig(filename, dpi=600, bbox_inches='tight')
+        print(f"Saved figure: {filename}")
+        # plt.show() # 如果在无界面环境可注释掉，本地运行可保留
 
     # 1. Total Error
-    plot_comparison(axes[0, 0], errors, 
-                   'Total 3D Euclidean Error (Noise=2.0)', 'Error (mm)')
+    plot_and_save(errors, 'Total 3D Euclidean Error (Noise=4.0)', 'Error (mm)', 'fig_error_total.png')
     
     # 2. X Error
-    plot_comparison(axes[0, 1], errors_xyz[:, :, 0], 
-                   'X-Axis Error', 'X Error (mm)')
+    plot_and_save(errors_xyz[:, :, 0], 'X-Axis Error', 'X Error (mm)', 'fig_error_x.png')
     
     # 3. Y Error
-    plot_comparison(axes[1, 0], errors_xyz[:, :, 1], 
-                   'Y-Axis Error', 'Y Error (mm)')
+    plot_and_save(errors_xyz[:, :, 1], 'Y-Axis Error', 'Y Error (mm)', 'fig_error_y.png')
     
     # 4. Z Error
-    plot_comparison(axes[1, 1], errors_xyz[:, :, 2], 
-                   'Z-Axis Error (Depth)', 'Z Error (mm)')
-    
-    plt.tight_layout()
-    # plt.savefig('positioning_result_points.png')
-    plt.show()
+    plot_and_save(errors_xyz[:, :, 2], 'Z-Axis Error (Depth)', 'Z Error (mm)', 'fig_error_z.png')
+

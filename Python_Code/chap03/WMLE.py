@@ -8,54 +8,63 @@ from scipy.linalg import svd
 # ==========================================
 class SimulationConfig:
     def __init__(self):
-        # 物理参数 (基于表1)
-        self.pixel_size = 0.01    # 假设像素尺寸 10um
-        self.n_points = 100       # 标记点数量
-        self.z_min = 1000.0       # 深度范围 1m
-        self.z_max = 6000.0       # 深度范围 6m
-        self.mc_trials = 100      # 蒙特卡洛次数 (增加次数以平滑曲线)
-        self.noise_levels = np.linspace(0, 2.0, 21) # 0 - 2.0 pixel
+        # ==========================================
+        # 修改：基于真实设备参数 (TCD1304 + 35mm镜头)
+        # ==========================================
+        self.pixel_size = 0.008   # 真实参数: 8um
+        self.n_points = 100       
+        self.z_min = 1000.0       
+        self.z_max = 6000.0       
+        self.mc_trials = 100
+        # 考虑到像元更小(8um)，同样的物理抖动会导致更大的像素误差
+        # 将测试范围扩大到 0 ~ 4.0 pixel，以验证极端工况
+        self.noise_levels = np.linspace(0, 4.0, 21) 
         
-        # 定义 CCD1 的几何 (只需仿真一个相机即可对比算法)
-        # 坐标来自 Table 1
-        self.ccd_in = np.array([51.96, 30.00, 0.00])
-        self.ccd_out = np.array([77.94, 45.00, 0.00])
-        # 透镜轴端点 a1, b1 (Z=50)
-        self.lens_a = np.array([49.95, 63.48, 50.00])
-        self.lens_b = np.array([79.95, 11.52, 50.00])
+        # --- 几何配置重算 ---
+        # 设定 Camera 1 安装在 30度 方向 (保持原代码的象限习惯)
+        # 安装半径 R = 80.0 mm
+        # 焦距/透镜高度 f = 35.0 mm
+        R = 80.0
+        f_val = 35.0
+        angle_deg = 30.0
+        angle_rad = np.radians(angle_deg)
         
+        # 方向向量 (Radial direction)
+        dir_vec = np.array([np.cos(angle_rad), np.sin(angle_rad), 0.0]) # [0.866, 0.5, 0]
+        
+        # 1. 计算透镜中心 Oc
+        # X = 80 cos(30), Y = 80 sin(30), Z = 35
+        self.Oc = np.array([R * dir_vec[0], R * dir_vec[1], f_val]) 
+        
+        # 2. 计算 CCD 几何
+        # CCD 中心位于透镜正下方 Z=0
+        ccd_center = np.array([R * dir_vec[0], R * dir_vec[1], 0.0])
+        
+        # CCD 长度 (TCD1304: 3648 * 0.008 = 29.184 mm)
+        ccd_len = 3648 * 0.008
+        
+        # CCD 沿径向放置 (Radial) -> 它的方向向量就是 dir_vec
+        self.ccd_in  = ccd_center - (ccd_len / 2.0) * dir_vec
+        self.ccd_out = ccd_center + (ccd_len / 2.0) * dir_vec
+        
+        # 3. 计算透镜两端 (Lens Axis)
+        # 柱面透镜的轴向应该 垂直于 CCD方向 (切向, Tangential)
+        # Lens axis direction: [-sin, cos, 0]
+        lens_axis_dir = np.array([-np.sin(angle_rad), np.cos(angle_rad), 0.0])
+        
+        # 假设透镜长度 60mm
+        lens_len = 60.0
+        self.lens_a = self.Oc - (lens_len / 2.0) * lens_axis_dir
+        self.lens_b = self.Oc + (lens_len / 2.0) * lens_axis_dir
+        
+        self.f_true = f_val 
+        
+        # 重新计算 Ground Truth L
         self.L_true = self.compute_ground_truth_L()
-        self.f_true = 50.0 # 理论真值
 
     def compute_ground_truth_L(self):
-        """
-        根据线阵相机物理模型构建投影矩阵 L
-        原理：线阵相机的投影是由透镜中心和透镜主轴决定的平面投影。
-        """
-        # 1. 计算透镜中心 (Optical Center)
+        # 使用 self.Oc 替代原来硬编码的计算
         Oc = (self.lens_a + self.lens_b) / 2.0
-        
-        # 2. 计算 CCD 中心
-        O_ccd = (self.ccd_in + self.ccd_out) / 2.0
-        
-        # 3. 构建相机坐标系
-        # Z轴 (光轴): 指向物体方向。由于透镜在Z=50, CCD in Z=0, 物体在 Z>1000
-        # 光轴向量应该大致沿 +Z 方向。
-        # 严格来说，光轴是 CCD中心 指向 透镜中心 (或者反之，取决于视角定义)
-        # 这里建立局部坐标系：原点在透镜中心 Oc
-        
-        # 4. 计算旋转矩阵 R
-        # 定义相机的 u 轴 (传感器方向)
-        u_vec = self.ccd_out - self.ccd_in
-        u_vec = u_vec / np.linalg.norm(u_vec)
-        
-        # 定义透镜轴 v_lens (柱面镜轴向，光线在此方向无折射/聚焦，即被压缩)
-        # 实际上，线阵相机模型中，投影平面是由 光心 和 透镜轴 决定的？
-        # 不，简化模型：我们可以算出 L矩阵的解析解。
-        
-        # 根据论文公式，我们需要求解 L。
-        # 这里为了仿真鲁棒，我们直接用海量无噪声点 "标定" 出一个 Ground Truth L
-        # 这样避免了手动推导复杂几何向量的微小误差
         return self.solve_L_from_perfect_data(Oc)
 
     def solve_L_from_perfect_data(self, Oc):
@@ -65,13 +74,8 @@ class SimulationConfig:
         Z = np.random.uniform(1000, 6000, 200)
         pts_3d = np.column_stack((X, Y, Z))
         
-        # 物理投影过程：
-        # 1. 3D点 M 连接 光心 Oc -> 射线
-        # 2. 射线与 CCD平面 (Z=0) 的交点 P_ccd
-        # 3. P_ccd 投影到 CCD 线段上 (点积)
-        
+        # 物理投影过程
         u_ideal = []
-        # CCD 向量
         vec_ccd = self.ccd_out - self.ccd_in
         len_ccd = np.linalg.norm(vec_ccd)
         dir_ccd = vec_ccd / len_ccd
@@ -86,15 +90,10 @@ class SimulationConfig:
             P_plane = Oc + t * direction
             
             # 投影到 1D 传感器直线上 (Project P_plane onto line passing through ccd_in with dir_ccd)
-            # u_mm = (P_plane - ccd_in) dot dir_ccd
-            # 这一步假设了柱面透镜完美将垂直方向光线压缩到直线上
             vec_p = P_plane - self.ccd_in
             u_mm = np.dot(vec_p, dir_ccd)
             
-            # 转像素 (假设中心是 u0, 但这里我们直接用物理距离作为观测值，更纯粹)
-            # u_pix = u_mm / pixel_size. 
-            # 为了简化，我们在 L 中直接隐含 pixel_size，或者直接标定物理 L
-            # 论文中的 L 映射到 pixel，我们这里映射到 pixel
+            # 转像素
             u_ideal.append(u_mm / self.pixel_size)
             
         u_ideal = np.array(u_ideal)
@@ -365,7 +364,11 @@ def run_simulation():
         reproj_errs[i] = e_r / cfg.mc_trials
         true_reproj_errs[i] = e_r_true / cfg.mc_trials
         focal_errs[i] = e_f / cfg.mc_trials
-        print(f"Noise Level {noise_level:.1f}: LM f_err={focal_errs[i, 1]:.3f}, WMLE f_err={focal_errs[i, 2]:.3f}")
+        
+        print(f"--- Noise Level {noise_level:.2f} px ---")
+        print(f"  Reproj Error (Residual): DLT={reproj_errs[i, 0]:.4f}, LM={reproj_errs[i, 1]:.4f}, WMLE={reproj_errs[i, 2]:.4f}")
+        print(f"  True Reproj Err (Acc):   DLT={true_reproj_errs[i, 0]:.4f}, LM={true_reproj_errs[i, 1]:.4f}, WMLE={true_reproj_errs[i, 2]:.4f}")
+        print(f"  Focal Length Error:      DLT={focal_errs[i, 0]:.4f}, LM={focal_errs[i, 1]:.4f}, WMLE={focal_errs[i, 2]:.4f}")
     
     return cfg.noise_levels, reproj_errs, true_reproj_errs, focal_errs
 
@@ -418,37 +421,83 @@ def calibrate_WMLE_Heteroscedastic(points_3d, u_meas, L_init, sigma_array):
 if __name__ == "__main__":
     noise_levels, reproj_errs, true_reproj_errs, focal_errs = run_simulation()
 
-    fig, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=(18, 5))
+    # === 设置科研绘图风格 ===
+    # 字体与字号
+    plt.rcParams['font.family'] = 'sans-serif'
+    plt.rcParams['font.sans-serif'] = ['Arial', 'DejaVu Sans', 'SimHei'] # 优先使用 Arial
+    plt.rcParams['axes.unicode_minus'] = False  # 解决负号显示问题
+    plt.rcParams['font.size'] = 12
+    plt.rcParams['axes.labelsize'] = 13
+    plt.rcParams['axes.titlesize'] = 14
+    plt.rcParams['xtick.labelsize'] = 11
+    plt.rcParams['ytick.labelsize'] = 11
+    plt.rcParams['legend.fontsize'] = 11
+    
+    # 刻度与边框
+    plt.rcParams['xtick.direction'] = 'in'
+    plt.rcParams['ytick.direction'] = 'in'
+    plt.rcParams['xtick.major.size'] = 5
+    plt.rcParams['ytick.major.size'] = 5
+    
+    # 定义更专业、高对比度的线条样式
+    # 采用明亮鲜艳的蓝(LM)黄(DLT)绿(WMLE)
+    styles = {
+        'DLT':  {'color': '#E6B800', 'linestyle': '--', 'marker': 'o', 'markersize': 5, 'markevery': 2, 'linewidth': 1.5, 'label': 'DLT (Norm)'}, # 黄色
+        'LM':   {'color': '#1f77b4', 'linestyle': '-.', 'marker': 's', 'markersize': 5, 'markevery': 2, 'linewidth': 1.5, 'label': 'LM-Optim'},   # 蓝色
+        'WMLE': {'color': '#2ca02c', 'linestyle': '-',  'marker': '^', 'markersize': 6, 'markevery': 2, 'linewidth': 2.0, 'label': 'WMLE (Ours)'}  # 绿色
+    }
+    
+    import os
+    # 确保保存目录存在
+    save_dir = './1/'
+    if not os.path.exists(save_dir):
+        try:
+            os.makedirs(save_dir, exist_ok=True)
+        except OSError:
+            save_dir = './' # 回退到当前目录
 
-    # Plot 1: Reprojection (vs Noisy Measurement)
-    ax1.plot(noise_levels, reproj_errs[:, 0], 'k--', label='DLT (Norm)')
-    ax1.plot(noise_levels, reproj_errs[:, 1], 'b-.', label='LM')
-    ax1.plot(noise_levels, reproj_errs[:, 2], 'r-', linewidth=2, label='WMLE')
-    ax1.set_xlabel('Noise (pixels)')
-    ax1.set_ylabel('Reprojection RMSE (vs Noisy Data)')
-    ax1.set_title('Measurement Residual (Fitting Error)')
-    ax1.legend()
-    ax1.grid(True, alpha=0.3)
+    def plot_and_save(x, ys, title, ylabel, filename):
+        plt.figure(figsize=(7, 5.5)) # 4:3 比例稍宽
+        
+        # 绘制三条线
+        plt.plot(x, ys[:, 0], **styles['DLT'])
+        plt.plot(x, ys[:, 1], **styles['LM'])
+        plt.plot(x, ys[:, 2], **styles['WMLE'])
+        
+        plt.xlabel('Noise Standard Deviation (pixels)', fontweight='bold')
+        plt.ylabel(ylabel, fontweight='bold')
+        plt.title(title, pad=15)
+        
+        # 网格与图例
+        plt.grid(True, linestyle='--', alpha=0.4, linewidth=0.7)
+        plt.legend(frameon=True, fancybox=False, edgecolor='black', loc='best')
+        
+        # 加粗边框（符合论文出版要求）
+        ax = plt.gca()
+        for spine in ax.spines.values():
+            spine.set_linewidth(1.2)
+            
+        plt.tight_layout()
+        save_path = os.path.join(save_dir, filename)
+        print(f"Saving figure to {save_path}")
+        plt.savefig(save_path, dpi=600, bbox_inches='tight')
 
-    # Plot 2: True Reprojection (vs Ground Truth)
-    ax2.plot(noise_levels, true_reproj_errs[:, 0], 'k--', label='DLT (Norm)')
-    ax2.plot(noise_levels, true_reproj_errs[:, 1], 'b-.', label='LM')
-    ax2.plot(noise_levels, true_reproj_errs[:, 2], 'r-', linewidth=2, label='WMLE')
-    ax2.set_xlabel('Noise (pixels)')
-    ax2.set_ylabel('True Reprojection RMSE (pixels)')
-    ax2.set_title('True Geometric Error (vs Ground Truth)')
-    ax2.legend()
-    ax2.grid(True, alpha=0.3)
+    # Plot 1: Reprojection (Measurement Residual)
+    plot_and_save(noise_levels, reproj_errs, 
+                  'Measurement Residual (Fitting Error)', 
+                  'Reprojection RMSE (pixels)', 
+                  'reproj_residual.png')
 
-    # Plot 3: Focal Length
-    ax3.plot(noise_levels, focal_errs[:, 0], 'k--', label='DLT (Norm)')
-    ax3.plot(noise_levels, focal_errs[:, 1], 'b-.', label='LM')
-    ax3.plot(noise_levels, focal_errs[:, 2], 'r-', linewidth=2, label='WMLE')
-    ax3.set_xlabel('Noise (pixels)')
-    ax3.set_ylabel('Focal Length Error (mm)')
-    ax3.set_title('Physical Parameter Recovery Error')
-    ax3.legend()
-    ax3.grid(True, alpha=0.3)
+    # Plot 2: True Geometric Error
+    plot_and_save(noise_levels, true_reproj_errs, 
+                  'True Geometric Error (vs Ground Truth)', 
+                  'True Reprojection RMSE (pixels)', 
+                  'reproj_true_accuracy.png')
 
-    plt.tight_layout()
+    # Plot 3: Focal Length Recovery
+    plot_and_save(noise_levels, focal_errs, 
+                  'Physical Parameter Estimation Error', 
+                  'Focal Length Error (mm)', 
+                  'focal_length_error.png')
+
     plt.show()

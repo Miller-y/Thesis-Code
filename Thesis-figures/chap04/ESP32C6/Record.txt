@@ -22,3 +22,18 @@ filter_comparison_106（filter_comparison_106_report）
 在绘图的同时，计算各种关键指标，
 基于这些指标，根据逻辑自动生成一段推荐结论。
 这个分析和结论会直接打印在控制台，并在同图片输出目录下保存为一个单独的 .txt 报告文件。
+
+
+
+\chapter{基于信道状态信息的室内定位算法与系统设计}
+\section{引言}
+\section{基于嵌入式设备的分布式单天线节点分析}
+\section{幅值与相位特征的稳定性与可用性分析}
+\section{CSI室内定位系统架构设计}
+\section{数据张量构建}
+\section{多尺度时序特征提取（MSTC）}
+\section{基于ConvNeXt的主干网络设计}
+\section{时频域注意力机制与特征校准}
+\section{基于物理约束的损失函数与输出平滑}
+\section{网络复杂度与理论性能分析}
+\section{本章小结}
